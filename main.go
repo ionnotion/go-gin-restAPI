@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +25,7 @@ type Language struct {
 }
 
 func handleOtherRoutes(ctx *gin.Context) {
-	ctx.String(405,"Method not allowed")
+	ctx.JSON(405, gin.H{"message":"Method not allowed"})
 }
 
 func reverser(text string) string {
@@ -35,6 +36,12 @@ func reverser(text string) string {
 	}
 	fmt.Println(text, sb.String())
 	return sb.String()
+}
+
+func removeIndex(arr []Language, index int) []Language {
+    ret := make([]Language, 0)
+    ret = append(ret, arr[:index]...)
+    return append(ret, arr[index+1:]...)
 }
 
 func checkPalindrome(text string) bool {
@@ -63,15 +70,16 @@ func main() {
 				"Go"},
 		},
 	}
+	languages := []Language{newLanguage}
 
 	router.GET("/", func(ctx *gin.Context) {
-		ctx.String(http.StatusOK, "Hello Go Developers")
+		ctx.JSON(http.StatusOK, gin.H{"message":"Hello Go Developers"})
 	})
 
-	router.GET("/language", func(ctx *gin.Context) {
-		fmt.Println(newLanguage)
-		b, err := json.MarshalIndent(newLanguage,""," ")
-		fmt.Println(string(b))
+	router.GET("/languages", func(ctx *gin.Context) {
+		// fmt.Println(newLanguage)
+		b, err := json.MarshalIndent(languages,""," ")
+		// fmt.Println(string(b))
 		if err != nil {
 			fmt.Printf("Error: %s", err)
 			return
@@ -82,6 +90,11 @@ func main() {
 	router.GET("/palindrome",func(ctx *gin.Context) {
 		text, _ := ctx.GetQuery("text")
 
+		if text == "" {
+			handleOtherRoutes(ctx)
+			return
+		}
+
 		result := "Not Palindrome"
 		code := 400
 		if checkPalindrome(text) {
@@ -89,7 +102,74 @@ func main() {
 			code = 200
 		}
 
-		ctx.String(code, result)
+		ctx.JSON(code, gin.H{"message":result})
+	})
+
+	router.POST("/language",func(ctx *gin.Context) {
+		var language Language
+		ctx.BindJSON(&language)
+
+		languages = append(languages, language)
+		b, err := json.MarshalIndent(language,""," ")
+		// fmt.Println(string(b))
+		if err != nil {
+			fmt.Printf("Error: %s", err)
+			return
+		}
+		ctx.Data(201, gin.MIMEJSON, b)
+	})
+
+	router.GET("/language/:id",func(ctx *gin.Context) {
+		id, err := strconv.Atoi(ctx.Param("id"))
+		
+		if err !=nil {
+			handleOtherRoutes(ctx)
+			return
+		}
+
+		language := languages[id]
+
+		b, err := json.MarshalIndent(language,""," ")
+
+		if err != nil {
+			fmt.Printf("Error: %s", err)
+			return
+		}
+		ctx.Data(http.StatusOK, gin.MIMEJSON, b)
+	})
+
+	router.PATCH("/language/:id",func(ctx *gin.Context) {
+		id, err := strconv.Atoi(ctx.Param("id"))
+		
+		if err !=nil {
+			handleOtherRoutes(ctx)
+			return
+		}
+
+		var language Language
+		ctx.BindJSON(&language)
+
+		languages[id] = language
+		b, err := json.MarshalIndent(language,""," ")
+
+		if err != nil {
+			fmt.Printf("Error: %s", err)
+			return
+		}
+		ctx.Data(http.StatusOK, gin.MIMEJSON, b)
+	})
+
+	router.DELETE("/language/:id",func(ctx *gin.Context) {
+		id, err := strconv.Atoi(ctx.Param("id"))
+		
+		if err !=nil {
+			handleOtherRoutes(ctx)
+			return
+		}
+
+		languages = removeIndex(languages,id)
+
+		ctx.JSON(http.StatusOK, gin.H{"message":"deleted"})
 	})
 
 	router.NoMethod(handleOtherRoutes)
